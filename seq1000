@@ -1,0 +1,141 @@
+       IDENTIFICATION DIVISION.
+
+       PROGRAM-ID.  SEQ1000.
+
+       ENVIRONMENT DIVISION.
+
+       INPUT-OUTPUT SECTION.
+
+       FILE-CONTROL.
+           SELECT RCTTRAN  ASSIGN TO RCTTRAN.
+           SELECT OLDMAST  ASSIGN TO OLDMAST.
+           SELECT NEWMAST  ASSIGN TO NEWMAST
+                           FILE STATUS IS NEWMAST-FILE-STATUS.
+           SELECT ERRTRAN  ASSIGN TO ERRTRAN
+                           FILE STATUS IS ERRTRAN-FILE-STATUS.
+
+       DATA DIVISION.
+
+       FILE SECTION.
+
+       FD  RCTTRAN.
+
+       01  TRANSACTION-RECORD      PIC X(23).
+
+       FD  OLDMAST.
+
+       01  OLD-MASTER-RECORD       PIC X(70).
+
+       FD  NEWMAST.
+
+       01  NEW-MASTER-RECORD       PIC X(70).
+
+       FD  ERRTRAN.
+
+       01  ERROR-TRANSACTION       PIC X(23).
+
+       WORKING-STORAGE SECTION. 
+
+       01  SWITCHES. 
+           05  FIRST-EXECUTION-SWITCH          PIC X   VALUE "Y".
+               88  FIRST-EXECUTION                     VALUE "Y".
+           05  ALL-RECORDS-PROCESSED-SWITCH    PIC X   VALUE "N".
+               88  ALL-RECORDS-PROCESSED               VALUE "Y".
+
+       01  FILE-STATUS-FIELDS. 
+           05  NEWMAST-FILE-STATUS     PIC XX.
+               88  NEWMAST-SUCCESSFUL          VALUE "00".
+           05  ERRTRAN-FILE-STATUS     PIC XX.
+               88  ERRTRAN-SUCCESSFUL          VALUE "00".
+
+       01  RECEIPT-TRANSACTION.
+           05  RT-ITEM-NO              PIC X(5).
+           05  RT-VENDOR-NO            PIC X(5).
+           05  RT-RECEIPT-DATE         PIC X(8).
+           05  RT-RECEIPT-QUANTITY     PIC S9(5).
+
+       01  INVENTORY-MASTER-RECORD.
+           05  IM-ITEM-NO              PIC X(5).
+           05  IM-DESCRIPTIVE-DATA.
+               10  IM-ITEM-DESC        PIC X(40).
+               10  IM-UNIT-COST        PIC S9(3)V99.
+               10  IM-UNIT-PRICE       PIC S9(3)V99.
+           05  IM-INVENTORY-DATA.
+               10  IM-REORDER-POINT    PIC S9(5).
+               10  IM-ON-HAND          PIC S9(5).
+               10  IM-ON-ORDER         PIC S9(5).
+
+       PROCEDURE DIVISION. 
+
+       000-UPDATE-INVENTORY-MASTER.
+
+           OPEN INPUT  RCTTRAN
+                       OLDMAST
+                OUTPUT NEWMAST
+                EXTEND ERRTRAN.
+           MOVE LOW-VALUE TO IM-ITEM-NO. 
+           PERFORM 300-PROCESS-RECEIPT-TRAN
+               UNTIL ALL-RECORDS-PROCESSED. 
+           CLOSE RCTTRAN
+                 OLDMAST
+                 NEWMAST
+                 ERRTRAN.
+           STOP RUN. 
+
+       300-PROCESS-RECEIPT-TRAN.
+
+           PERFORM 310-READ-RECEIPT-TRANSACTION.
+           PERFORM 320-PROCESS-INVENTORY-MASTER
+               UNTIL IM-ITEM-NO >= RT-ITEM-NO.
+           IF      IM-ITEM-NO = HIGH-VALUE
+               AND RT-ITEM-NO = HIGH-VALUE
+               SET ALL-RECORDS-PROCESSED TO TRUE
+           ELSE
+               IF IM-ITEM-NO = RT-ITEM-NO
+                   PERFORM 350-APPLY-RECEIPT-TRANSACTION
+               ELSE
+                   PERFORM 360-WRITE-ERROR-TRANSACTION.
+
+       310-READ-RECEIPT-TRANSACTION.
+
+           READ RCTTRAN INTO RECEIPT-TRANSACTION
+               AT END
+                   MOVE HIGH-VALUE TO RT-ITEM-NO.
+
+       320-PROCESS-INVENTORY-MASTER.
+
+           IF FIRST-EXECUTION
+               PERFORM 330-READ-OLD-MASTER
+               MOVE "N" TO FIRST-EXECUTION-SWITCH
+           ELSE
+               PERFORM 340-WRITE-NEW-MASTER
+               PERFORM 330-READ-OLD-MASTER.
+
+       330-READ-OLD-MASTER.
+
+           READ OLDMAST INTO INVENTORY-MASTER-RECORD
+               AT END
+                   MOVE HIGH-VALUE TO IM-ITEM-NO.
+
+       340-WRITE-NEW-MASTER.
+
+           WRITE NEW-MASTER-RECORD FROM INVENTORY-MASTER-RECORD.
+           IF NOT NEWMAST-SUCCESSFUL
+               DISPLAY "WRITE ERROR ON NEWMAST FOR ITEM NUMBER "
+                   IM-ITEM-NO
+               DISPLAY "FILE STATUS CODE IS " NEWMAST-FILE-STATUS
+               SET ALL-RECORDS-PROCESSED TO TRUE.
+
+       350-APPLY-RECEIPT-TRANSACTION.
+
+           ADD RT-RECEIPT-QUANTITY TO IM-ON-HAND.
+           SUBTRACT RT-RECEIPT-QUANTITY FROM IM-ON-ORDER.
+
+       360-WRITE-ERROR-TRANSACTION.
+
+           WRITE ERROR-TRANSACTION FROM RECEIPT-TRANSACTION.
+           IF NOT ERRTRAN-SUCCESSFUL
+               DISPLAY "WRITE ERROR ON ERRTRAN FOR ITEM NUMBER "
+                   RT-ITEM-NO
+               DISPLAY "FILE STATUS CODE IS " ERRTRAN-FILE-STATUS
+               SET ALL-RECORDS-PROCESSED TO TRUE.
