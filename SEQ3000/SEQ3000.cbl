@@ -1,11 +1,8 @@
        IDENTIFICATION DIVISION.
-
        PROGRAM-ID.  SEQ3000.
 
        ENVIRONMENT DIVISION.
-
        INPUT-OUTPUT SECTION.
-
        FILE-CONTROL.
 
            SELECT EMPTRAN   ASSIGN TO EMPTRAN.
@@ -16,7 +13,6 @@
                             FILE STATUS IS ERRTRAN-FILE-STATUS.
 
        DATA DIVISION.
-
        FILE SECTION.
 
        FD  EMPTRAN.
@@ -67,16 +63,15 @@
                05 ET-DEPARTMENT-CODE   PIC X(5).
                05 ET-JOB-CLASS         PIC X(2).
                05 ET-ANNUAL-SALARY     PIC S9(5)V99.
-          
 
        01  EMPLOYEE-MASTER-RECORD.
-               05 EM-EMPLOYEE-ID       PIC X(5).
-               05 EM-EMPLOYEE-NAME     PIC X(30).         
-               05 EM-DEPARTMENT-CODE   PIC X(5).
-               05 EM-JOB-CLASS         PIC X(2).
-               05 EM-ANNUAL-SALARY     PIC S9(5)V99.
-               05 EM-VACATION-HOURS    PIC S9(3).
-               05 EM-SICK-HOURS        PIC S9(3)V99.
+           05 EM-EMPLOYEE-ID       PIC X(5).
+           05 EM-EMPLOYEE-NAME     PIC X(30).         
+           05 EM-DEPARTMENT-CODE   PIC X(5).
+           05 EM-JOB-CLASS         PIC X(2).
+           05 EM-ANNUAL-SALARY     PIC S9(5)V99.
+           05 EM-VACATION-HOURS    PIC S9(3).
+           05 EM-SICK-HOURS        PIC S9(3)V99.
 
        PROCEDURE DIVISION.
 
@@ -86,12 +81,15 @@
                        EMPTRAN
                 OUTPUT NEWEMP
                        ERRTRAN.
+
            PERFORM 300-MAINTAIN-EMPLOYEE-RECORD
                UNTIL ALL-RECORDS-PROCESSED.
+
            CLOSE EMPTRAN
                  OLDEMP
                  NEWEMP
                  ERRTRAN.
+
            STOP RUN.
 
        300-MAINTAIN-EMPLOYEE-RECORD.
@@ -99,10 +97,13 @@
            IF NEED-TRANSACTION
                PERFORM 310-READ-EMPLOYEE-TRANSACTION
                MOVE "N" TO NEED-TRANSACTION-SWITCH.
+
            IF NEED-MASTER
                PERFORM 320-READ-OLD-MASTER
                MOVE "N" TO NEED-MASTER-SWITCH.
+
            PERFORM 330-MATCH-MASTER-TRAN.
+
            IF WRITE-MASTER
                PERFORM 340-WRITE-NEW-MASTER
                MOVE "N" TO WRITE-MASTER-SWITCH.
@@ -111,13 +112,13 @@
 
            READ EMPTRAN INTO EMPLOYEE-TRANSACTION
                AT END
-                   MOVE HIGH-VALUE TO ET-EMPLOYEE-ID.
+                   MOVE HIGH-VALUES TO ET-EMPLOYEE-ID.
 
        320-READ-OLD-MASTER.
 
            READ OLDEMP INTO EMPLOYEE-MASTER-RECORD
                AT END
-                   MOVE HIGH-VALUE TO EM-EMPLOYEE-ID.
+                   MOVE HIGH-VALUES TO EM-EMPLOYEE-ID.
 
        330-MATCH-MASTER-TRAN.
 
@@ -131,6 +132,7 @@
        340-WRITE-NEW-MASTER.
 
            WRITE NEW-MASTER-RECORD.
+
            IF NOT NEWEMP-SUCCESSFUL
                DISPLAY "WRITE ERROR ON NEWEMP FOR ITEM NUMBER "
                    EM-EMPLOYEE-ID
@@ -171,10 +173,13 @@
            MOVE ET-JOB-CLASS TO NM-JOB-CLASS.
            MOVE ET-ANNUAL-SALARY TO NM-ANNUAL-SALARY.
 
+           SET WRITE-MASTER TO TRUE.
+           SET NEED-TRANSACTION TO TRUE.
 
        390-WRITE-ERROR-TRANSACTION.
 
            WRITE ERROR-TRANSACTION FROM EMPLOYEE-TRANSACTION.
+
            IF NOT ERRTRAN-SUCCESSFUL
                DISPLAY "WRITE ERROR ON ERRTRAN FOR EMPLOYEE ID "
                    ET-EMPLOYEE-ID
@@ -188,15 +193,22 @@
            SET NEED-MASTER TO TRUE.
            SET NEED-TRANSACTION TO TRUE.
 
-
        410-APPLY-CHANGE-TRANSACTION.
 
            IF ET-EMPLOYEE-NAME NOT = SPACE
                MOVE ET-EMPLOYEE-NAME TO EM-EMPLOYEE-NAME.
+
            IF ET-DEPARTMENT-CODE NOT = SPACE
                MOVE ET-DEPARTMENT-CODE TO EM-DEPARTMENT-CODE.
+
            IF ET-JOB-CLASS NOT = SPACE
                MOVE ET-JOB-CLASS TO EM-JOB-CLASS.
-           IF ET-ANNUAL-SALARY NOT = ZERO
+
+           IF ET-ANNUAL-SALARY NOT = ZEROES
                MOVE ET-ANNUAL-SALARY TO EM-ANNUAL-SALARY.
+
+           MOVE EMPLOYEE-MASTER-RECORD TO NEW-MASTER-RECORD.
+
+           SET WRITE-MASTER TO TRUE.
+           SET NEED-MASTER TO TRUE.
            SET NEED-TRANSACTION TO TRUE.
